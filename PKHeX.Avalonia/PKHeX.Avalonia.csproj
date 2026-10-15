@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>PKHeX.Avalonia</RootNamespace>
+    <AssemblyName>PKHeX.Avalonia</AssemblyName>
+    <Description>Cross-platform (Linux/macOS/Windows) save editor for Pokémon games, built on PKHeX.Core.</Description>
+    <ApplicationIcon>..\PKHeX.WinForms\Resources\icon.ico</ApplicationIcon>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.22" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PKHeX.Core\PKHeX.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Reuse the sprite naming logic (it only depends on PKHeX.Core). -->
+  <ItemGroup>
+    <Compile Include="..\PKHeX.Drawing.PokeSprite\Util\SpriteName.cs" Link="Shared\SpriteName.cs" />
+  </ItemGroup>
+
+  <!-- Reuse the sprite images shipped with PKHeX.Drawing.PokeSprite, embedded under simple logical names. -->
+  <PropertyGroup>
+    <SpriteRoot>..\PKHeX.Drawing.PokeSprite\Resources\img</SpriteRoot>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="$(SpriteRoot)\Big Pokemon Sprites\*.png" LogicalName="pk.%(Filename)" />
+    <EmbeddedResource Include="$(SpriteRoot)\Big Shiny Sprites\*.png" LogicalName="pk.%(Filename)" />
+    <EmbeddedResource Include="$(SpriteRoot)\ball\*.png" LogicalName="ball.%(Filename)" />
+    <EmbeddedResource Include="..\icon.png" LogicalName="app.icon" />
+  </ItemGroup>
+
+</Project>

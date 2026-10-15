@@ -1,0 +1,176 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PKHeX.Avalonia.MainWindow"
+        Title="PKHeX (Avalonia)"
+        Width="1180" Height="760" MinWidth="900" MinHeight="600"
+        DragDrop.AllowDrop="True">
+  <Window.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style Selector="Button.slot">
+      <Setter Property="Width" Value="76" />
+      <Setter Property="Height" Value="64" />
+      <Setter Property="Padding" Value="2" />
+      <Setter Property="Margin" Value="2" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.slot.selected">
+      <Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="ComboBox, TextBox, NumericUpDown">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Margin" Value="0,2" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel>
+    <Menu DockPanel.Dock="Top">
+      <MenuItem Header="_File">
+        <MenuItem Header="_Open…" InputGesture="Ctrl+O" Click="Menu_Open" />
+        <MenuItem x:Name="MenuSave" Header="_Save" InputGesture="Ctrl+S" Click="Menu_Save" IsEnabled="False" />
+        <MenuItem x:Name="MenuSaveAs" Header="Save _As…" InputGesture="Ctrl+Shift+S" Click="Menu_SaveAs" IsEnabled="False" />
+        <Separator />
+        <MenuItem Header="E_xit" Click="Menu_Exit" />
+      </MenuItem>
+      <MenuItem Header="_Pokémon">
+        <MenuItem Header="_Import from file…" Click="Menu_ImportPKM" />
+        <MenuItem Header="_Export to file…" Click="Menu_ExportPKM" />
+        <Separator />
+        <MenuItem Header="Check _legality" InputGesture="Ctrl+L" Click="Menu_Legality" />
+      </MenuItem>
+      <MenuItem Header="_Help">
+        <MenuItem Header="_About" Click="Menu_About" />
+      </MenuItem>
+    </Menu>
+
+    <Border DockPanel.Dock="Bottom" Padding="8,4" Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+      <TextBlock x:Name="StatusText" Text="Open a save file (File → Open, or drag and drop it onto this window)." />
+    </Border>
+
+    <Grid ColumnDefinitions="Auto,*" Margin="8">
+      <!-- Save file: info, boxes and party -->
+      <DockPanel Grid.Column="0" Margin="0,0,12,0">
+        <Border DockPanel.Dock="Top" Padding="8" CornerRadius="4" Margin="0,0,0,8"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+          <StackPanel Spacing="2">
+            <TextBlock x:Name="SaveTitle" FontWeight="Bold" FontSize="16" Text="No save file loaded" />
+            <TextBlock x:Name="SaveDetails" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <TabControl x:Name="StorageTabs">
+          <TabItem Header="Box">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,6">
+                <Button Grid.Column="0" Content="◀" Click="Box_Prev" />
+                <ComboBox Grid.Column="1" x:Name="BoxSelector" Margin="6,0" SelectionChanged="Box_Changed" />
+                <Button Grid.Column="2" Content="▶" Click="Box_Next" />
+              </Grid>
+              <WrapPanel x:Name="BoxGrid" Width="480" />
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="Party">
+            <WrapPanel x:Name="PartyGrid" Width="480" />
+          </TabItem>
+        </TabControl>
+      </DockPanel>
+
+      <!-- Pokémon editor -->
+      <DockPanel Grid.Column="1">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+          <Button x:Name="BtnApply" Content="Save to selected slot" Click="Slot_Apply" IsEnabled="False" />
+          <Button x:Name="BtnDelete" Content="Delete slot" Click="Slot_Delete" IsEnabled="False" />
+          <Button Content="Check legality" Click="Menu_Legality" />
+        </StackPanel>
+
+        <Border DockPanel.Dock="Top" Padding="8" CornerRadius="4" Margin="0,0,0,8"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <Image Grid.Column="0" x:Name="PreviewSprite" Width="68" Height="56" Margin="0,0,8,0" />
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+              <TextBlock x:Name="PreviewTitle" FontWeight="Bold" FontSize="16" />
+              <TextBlock x:Name="LegalityText" />
+            </StackPanel>
+            <Image Grid.Column="2" x:Name="BallSprite" Width="32" Height="32" />
+          </Grid>
+        </Border>
+
+        <TabControl x:Name="EditorTabs">
+          <TabItem Header="Main">
+            <ScrollViewer>
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="4">
+                <TextBlock Classes="label" Grid.Row="0" Text="Species" />
+                <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CB_Species" SelectionChanged="Species_Changed" />
+                <TextBlock Classes="label" Grid.Row="1" Text="Form" />
+                <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CB_Form" />
+                <TextBlock Classes="label" Grid.Row="2" Text="Nickname" />
+                <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto">
+                  <TextBox x:Name="TB_Nickname" />
+                  <CheckBox Grid.Column="1" x:Name="CHK_Nicknamed" Content="Nicknamed" Margin="8,0,0,0" />
+                </Grid>
+                <TextBlock Classes="label" Grid.Row="3" Text="Level" />
+                <NumericUpDown Grid.Row="3" Grid.Column="1" x:Name="NUD_Level" Minimum="1" Maximum="100" FormatString="0" Increment="1" />
+                <TextBlock Classes="label" Grid.Row="4" Text="Nature" />
+                <ComboBox Grid.Row="4" Grid.Column="1" x:Name="CB_Nature" />
+                <TextBlock Classes="label" Grid.Row="5" Text="Ability" />
+                <ComboBox Grid.Row="5" Grid.Column="1" x:Name="CB_Ability" />
+                <TextBlock Classes="label" Grid.Row="6" Text="Held Item" />
+                <ComboBox Grid.Row="6" Grid.Column="1" x:Name="CB_HeldItem" />
+                <TextBlock Classes="label" Grid.Row="7" Text="Ball" />
+                <ComboBox Grid.Row="7" Grid.Column="1" x:Name="CB_Ball" />
+                <TextBlock Classes="label" Grid.Row="8" Text="Language" />
+                <ComboBox Grid.Row="8" Grid.Column="1" x:Name="CB_Language" />
+                <TextBlock Classes="label" Grid.Row="9" Text="Gender" />
+                <TextBlock Grid.Row="9" Grid.Column="1" x:Name="L_Gender" VerticalAlignment="Center" Margin="0,6" />
+                <TextBlock Classes="label" Grid.Row="10" Text="Flags" />
+                <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal" Spacing="16">
+                  <CheckBox x:Name="CHK_Shiny" Content="Shiny" />
+                  <CheckBox x:Name="CHK_Egg" Content="Is Egg" />
+                </StackPanel>
+              </Grid>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="Moves">
+            <StackPanel Margin="4" Spacing="4">
+              <TextBlock Text="Current moves" FontWeight="Bold" />
+              <ComboBox x:Name="CB_Move1" />
+              <ComboBox x:Name="CB_Move2" />
+              <ComboBox x:Name="CB_Move3" />
+              <ComboBox x:Name="CB_Move4" />
+              <TextBlock Text="PP is restored to its maximum when saving." Opacity="0.7" />
+            </StackPanel>
+          </TabItem>
+
+          <TabItem Header="Stats">
+            <ScrollViewer>
+              <StackPanel Margin="4" Spacing="4">
+                <Grid x:Name="StatGrid" ColumnDefinitions="Auto,120,120,*" />
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
+                  <Button Content="Max IVs" Click="Stats_MaxIVs" />
+                  <Button Content="Clear EVs" Click="Stats_ClearEVs" />
+                </StackPanel>
+                <TextBlock x:Name="L_StatTotals" Opacity="0.7" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <TabItem Header="Trainer">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="4">
+              <TextBlock Classes="label" Grid.Row="0" Text="Original Trainer" />
+              <TextBox Grid.Row="0" Grid.Column="1" x:Name="TB_OT" />
+              <TextBlock Classes="label" Grid.Row="1" Text="TID" />
+              <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="NUD_TID" Minimum="0" Maximum="4294967295" FormatString="0" />
+              <TextBlock Classes="label" Grid.Row="2" Text="SID" />
+              <NumericUpDown Grid.Row="2" Grid.Column="1" x:Name="NUD_SID" Minimum="0" Maximum="4294967295" FormatString="0" />
+            </Grid>
+          </TabItem>
+        </TabControl>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>

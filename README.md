@@ -36,6 +36,20 @@ PKHeX is a Windows Forms application which requires [.NET 10](https://dotnet.mic
 
 The executable can be built with any compiler that supports C# 14.
 
+### Linux (Ubuntu) / macOS
+
+`PKHeX.Avalonia` is a cross-platform front end built on [Avalonia](https://avaloniaui.net/) and `PKHeX.Core`. It runs natively on Linux without Wine, and covers the main workflows: opening save files, browsing boxes and the party, editing a Pokémon (species, form, nickname, level, nature, ability, item, ball, moves, IVs/EVs, OT/TID/SID, shiny, egg), importing and exporting Pokémon files, checking legality, and saving. For anything else, use the full Windows Forms editor.
+
+On Ubuntu:
+
+```bash
+sudo apt install dotnet-sdk-10.0
+./PKHeX.Avalonia/build-linux.sh --install   # builds a self-contained binary and adds a "PKHeX" launcher
+pkhex /path/to/save                          # or open it from the applications menu
+```
+
+To run without installing: `dotnet run --project PKHeX.Avalonia -c Release`.
+
 ### Build Configurations
 
 Use the Debug or Release build configurations when building. There isn't any platform specific code to worry about!
