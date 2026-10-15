@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private ComboBox[] MoveBoxes = [];
 
     private bool Loading;
+    private int LoadedAbilityIndex = -1;
 
     private static readonly string[] StatNames = ["HP", "Attack", "Defense", "Speed", "Sp. Atk", "Sp. Def"];
 
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
             Icon = new WindowIcon(icon);
         MoveBoxes = [CB_Move1, CB_Move2, CB_Move3, CB_Move4];
         BuildStatGrid();
+        BuildDetailTabs();
 
         AddHandler(DragDrop.DropEvent, OnDrop);
         AddHandler(DragDrop.DragOverEvent, (_, e) => e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None);
@@ -54,53 +56,9 @@ public partial class MainWindow : Window
 
     #region Messages
 
-    private Task ShowMessage(string title, string message)
-    {
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 520,
-            SizeToContent = SizeToContent.Height,
-            MaxHeight = 640,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-        };
-        var ok = new Button { Content = "OK", HorizontalAlignment = HorizontalAlignment.Right, IsDefault = true, IsCancel = true };
-        ok.Click += (_, _) => dialog.Close();
-        var text = new SelectableTextBlock { Text = message, TextWrapping = TextWrapping.Wrap };
-        var panel = new DockPanel { Margin = new(16) };
-        DockPanel.SetDock(ok, Dock.Bottom);
-        ok.Margin = new(0, 12, 0, 0);
-        panel.Children.Add(ok);
-        panel.Children.Add(new ScrollViewer { Content = text, MaxHeight = 520 });
-        dialog.Content = panel;
-        return dialog.ShowDialog(this);
-    }
+    private Task ShowMessage(string title, string message) => Ui.ShowMessage(this, title, message);
 
-    private async Task<bool> Confirm(string title, string message)
-    {
-        bool result = false;
-        var dialog = new Window
-        {
-            Title = title,
-            Width = 460,
-            SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-        };
-        var yes = new Button { Content = "Yes", IsDefault = true };
-        var no = new Button { Content = "No", IsCancel = true };
-        yes.Click += (_, _) => { result = true; dialog.Close(); };
-        no.Click += (_, _) => dialog.Close();
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0, 12, 0, 0), Children = { yes, no } };
-        var panel = new DockPanel { Margin = new(16) };
-        DockPanel.SetDock(buttons, Dock.Bottom);
-        panel.Children.Add(buttons);
-        panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
-        dialog.Content = panel;
-        await dialog.ShowDialog(this);
-        return result;
-    }
+    private Task<bool> Confirm(string title, string message) => Ui.Confirm(this, title, message);
 
     private void SetStatus(string message) => StatusText.Text = message;
 
@@ -283,15 +241,8 @@ public partial class MainWindow : Window
         MenuSave.IsEnabled = MenuSaveAs.IsEnabled = sav.State.Exportable;
         UpdateTitle();
 
-        var details = new List<string>
-        {
-            $"Game: {GameInfo.GetVersionName(sav.Version)} (Gen {sav.Generation})",
-            $"Trainer: {sav.OT}  ·  TID: {sav.DisplayTID}",
-            $"Played: {sav.PlayTimeString.Replace('ː', ':')}",
-        };
-        if (!sav.ChecksumsValid)
-            details.Add("⚠ Checksums are invalid.");
-        SaveDetails.Text = string.Join(Environment.NewLine, details);
+        RefreshSaveInfo();
+        UpdateToolMenus(sav);
 
         BuildBoxSlots();
         BuildPartySlots();
@@ -600,27 +551,9 @@ public partial class MainWindow : Window
 
     #region Editor
 
-    private static void SetSource(ComboBox cb, IReadOnlyList<ComboItem> list)
-    {
-        cb.DisplayMemberBinding ??= new Binding(nameof(ComboItem.Text));
-        cb.ItemsSource = list;
-    }
-
-    private static int GetValue(ComboBox cb) => cb.SelectedItem is ComboItem item ? item.Value : 0;
-
-    private static void SetValue(ComboBox cb, int value)
-    {
-        if (cb.ItemsSource is not IReadOnlyList<ComboItem> list)
-            return;
-        for (int i = 0; i < list.Count; i++)
-        {
-            if (list[i].Value != value)
-                continue;
-            cb.SelectedIndex = i;
-            return;
-        }
-        cb.SelectedIndex = list.Count > 0 ? 0 : -1;
-    }
+    private static void SetSource(ComboBox cb, IReadOnlyList<ComboItem> list) => Ui.SetSource(cb, list);
+    private static int GetValue(ComboBox cb) => Ui.GetValue(cb);
+    private static void SetValue(ComboBox cb, int value) => Ui.SetValue(cb, value);
 
     private void PopulateFilteredSources()
     {
@@ -718,6 +651,7 @@ public partial class MainWindow : Window
         CB_Ability.IsEnabled = format >= 3;
         RefreshAbilities();
         SelectAbility(pk);
+        LoadedAbilityIndex = CB_Ability.SelectedIndex;
 
         CB_HeldItem.IsEnabled = format >= 2;
         SetValue(CB_HeldItem, pk.HeldItem);
@@ -751,6 +685,8 @@ public partial class MainWindow : Window
         NUD_TID.Value = pk.DisplayTID;
         NUD_SID.Value = pk.DisplaySID;
         NUD_SID.IsEnabled = format >= 3;
+
+        LoadDetails(pk);
 
         Loading = false;
         UpdatePreview(pk);
@@ -877,27 +813,44 @@ public partial class MainWindow : Window
     /// </summary>
     private PKM GetEditedEntity()
     {
-        var pk = Current.Clone();
+        // Only fields the user actually changed are written, so that saving an untouched Pokémon
+        // doesn't alter data the editor doesn't show (EXP within a level, PP, string trash bytes, …).
+        var original = Current;
+        var pk = original.Clone();
         var format = pk.Format;
 
         pk.Species = (ushort)GetValue(CB_Species);
         if (pk.Species == 0)
             return pk;
+        bool speciesChanged = pk.Species != original.Species;
         pk.Form = (byte)Math.Max(0, CB_Form.SelectedIndex);
-        pk.Language = GetValue(CB_Language);
+        ApplyIdentifiers(pk);
+        var language = GetValue(CB_Language);
+        if (language != original.Language)
+            pk.Language = language;
         pk.IsEgg = CHK_Egg.IsChecked == true;
 
-        if (CHK_Nicknamed.IsChecked == true && !string.IsNullOrWhiteSpace(TB_Nickname.Text))
-            pk.SetNickname(TB_Nickname.Text);
-        else
-            pk.ClearNickname();
+        var nickname = TB_Nickname.Text ?? string.Empty;
+        var nicknamed = CHK_Nicknamed.IsChecked == true;
+        if (nicknamed != original.IsNicknamed || nickname != original.Nickname || speciesChanged || language != original.Language)
+        {
+            if (nicknamed && !string.IsNullOrWhiteSpace(nickname))
+                pk.SetNickname(nickname);
+            else
+                pk.ClearNickname();
+        }
 
-        pk.CurrentLevel = (byte)Math.Clamp((int)(NUD_Level.Value ?? 1), 1, 100);
-        if (format >= 2)
-            pk.HeldItem = GetValue(CB_HeldItem);
+        var level = (byte)Math.Clamp((int)(NUD_Level.Value ?? 1), 1, 100);
+        if (speciesChanged || level != original.CurrentLevel)
+            pk.CurrentLevel = level;
+        var item = GetValue(CB_HeldItem);
+        if (format >= 2 && item != original.HeldItem)
+            pk.HeldItem = item;
         if (format >= 3)
         {
-            pk.Ball = (byte)GetValue(CB_Ball);
+            var ball = (byte)GetValue(CB_Ball);
+            if (ball != original.Ball)
+                pk.Ball = ball;
             var nature = (Nature)GetValue(CB_Nature);
             if (nature != pk.Nature)
             {
@@ -907,30 +860,64 @@ public partial class MainWindow : Window
                     pk.Nature = nature;
                 pk.StatAlignment = nature;
             }
-            if (CB_Ability.SelectedIndex >= 0)
-                pk.RefreshAbility(CB_Ability.SelectedIndex);
+            var ability = CB_Ability.SelectedIndex;
+            if (ability >= 0 && (speciesChanged || pk.Form != original.Form || ability != LoadedAbilityIndex))
+                pk.RefreshAbility(ability);
         }
 
         Span<ushort> moves = stackalloc ushort[4];
+        Span<ushort> oldMoves = stackalloc ushort[4];
+        original.GetMoves(oldMoves);
         for (int i = 0; i < 4; i++)
             moves[i] = (ushort)GetValue(MoveBoxes[i]);
-        pk.SetMoves(moves);
-        pk.HealPP();
+        if (!moves.SequenceEqual(oldMoves))
+        {
+            pk.SetMoves(moves);
+            pk.HealPP();
+        }
 
         ApplyStatFields(pk);
 
-        pk.OriginalTrainerName = TB_OT.Text ?? string.Empty;
-        pk.DisplayTID = (uint)(NUD_TID.Value ?? 0);
-        if (format >= 3)
-            pk.DisplaySID = (uint)(NUD_SID.Value ?? 0);
+        var ot = TB_OT.Text ?? string.Empty;
+        if (ot != original.OriginalTrainerName)
+            pk.OriginalTrainerName = ot;
+        var tid = (uint)(NUD_TID.Value ?? 0);
+        if (tid != original.DisplayTID)
+            pk.DisplayTID = tid;
+        var sid = (uint)(NUD_SID.Value ?? 0);
+        if (format >= 3 && sid != original.DisplaySID)
+            pk.DisplaySID = sid;
+
+        ApplyDetails(pk);
 
         var shiny = CHK_Shiny.IsChecked == true;
         if (shiny != pk.IsShiny)
             pk.SetIsShiny(shiny);
 
-        pk.ResetPartyStats();
+        // Nothing edited: hand back an exact copy.
+        if (IsStoredDataEqual(pk, original))
+            return original.Clone();
+
+        // Keep calculated stats in sync for Pokémon that store them (party data), preserving current HP.
+        if (original.PartyStatsPresent)
+        {
+            var hp = original.Stat_HPCurrent;
+            pk.ResetPartyStats();
+            pk.Stat_HPCurrent = Math.Min(hp, pk.Stat_HPMax);
+        }
         pk.RefreshChecksum();
         return pk;
+    }
+
+    private static bool IsStoredDataEqual(PKM a, PKM b)
+    {
+        if (a.SIZE_STORED != b.SIZE_STORED)
+            return false;
+        Span<byte> x = stackalloc byte[a.SIZE_STORED];
+        Span<byte> y = stackalloc byte[b.SIZE_STORED];
+        a.WriteDecryptedDataStored(x);
+        b.WriteDecryptedDataStored(y);
+        return x.SequenceEqual(y);
     }
 
     private void UpdatePreview(PKM pk)

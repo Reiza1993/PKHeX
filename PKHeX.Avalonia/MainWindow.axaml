@@ -5,6 +5,11 @@
         Width="1180" Height="760" MinWidth="900" MinHeight="600"
         DragDrop.AllowDrop="True">
   <Window.Styles>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="Padding" Value="10,2" />
+      <Setter Property="MinHeight" Value="34" />
+    </Style>
     <Style Selector="TextBlock.label">
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="Margin" Value="0,0,8,0" />
@@ -40,7 +45,26 @@
         <MenuItem Header="_Import from file…" Click="Menu_ImportPKM" />
         <MenuItem Header="_Export to file…" Click="Menu_ExportPKM" />
         <Separator />
+        <MenuItem Header="Import _Showdown set…" Click="Menu_ShowdownImport" />
+        <MenuItem Header="Export S_howdown set…" Click="Menu_ShowdownExport" />
+        <Separator />
         <MenuItem Header="Check _legality" InputGesture="Ctrl+L" Click="Menu_Legality" />
+      </MenuItem>
+      <MenuItem x:Name="MenuTools" Header="_Tools" IsEnabled="False">
+        <MenuItem x:Name="MenuTrainer" Header="_Trainer…" Click="Menu_Trainer" />
+        <MenuItem x:Name="MenuBag" Header="_Bag / Items…" Click="Menu_Bag" />
+        <MenuItem x:Name="MenuDex" Header="_Pokédex…" Click="Menu_Pokedex" />
+        <MenuItem x:Name="MenuEvents" Header="_Event flags…" Click="Menu_EventFlags" />
+        <Separator />
+        <MenuItem Header="Batch _editor…" Click="Menu_Batch" />
+        <Separator />
+        <MenuItem x:Name="MenuBoxes" Header="Bo_xes">
+          <MenuItem Header="Sort all boxes by species" Click="Menu_SortBoxes" />
+          <MenuItem Header="Clear current box" Click="Menu_ClearBox" />
+          <MenuItem Header="Export all boxes to folder…" Click="Menu_DumpBoxes" />
+          <MenuItem Header="Export current box as Showdown text…" Click="Menu_ShowdownBox" />
+          <MenuItem Header="Legality report for all boxes…" Click="Menu_LegalityReport" />
+        </MenuItem>
       </MenuItem>
       <MenuItem Header="_Help">
         <MenuItem Header="_About" Click="Menu_About" />
