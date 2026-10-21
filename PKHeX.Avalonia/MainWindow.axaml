@@ -48,6 +48,8 @@
         <MenuItem Header="Import _Showdown set…" Click="Menu_ShowdownImport" />
         <MenuItem Header="Export S_howdown set…" Click="Menu_ShowdownExport" />
         <Separator />
+        <MenuItem Header="Evolve by _trade" Click="Menu_TradeEvolve" />
+        <Separator />
         <MenuItem Header="Check _legality" InputGesture="Ctrl+L" Click="Menu_Legality" />
       </MenuItem>
       <MenuItem x:Name="MenuTools" Header="_Tools" IsEnabled="False">
@@ -57,6 +59,7 @@
         <MenuItem x:Name="MenuEvents" Header="_Event flags…" Click="Menu_EventFlags" />
         <Separator />
         <MenuItem Header="Batch _editor…" Click="Menu_Batch" />
+        <MenuItem x:Name="MenuGen3" IsVisible="False" Header="_Gen 3 tools (FireRed/LeafGreen, Ruby/Sapphire/Emerald)…" Click="Menu_Gen3" />
         <Separator />
         <MenuItem x:Name="MenuBoxes" Header="Bo_xes">
           <MenuItem Header="Sort all boxes by species" Click="Menu_SortBoxes" />
@@ -149,7 +152,7 @@
                 <TextBlock Classes="label" Grid.Row="8" Text="Language" />
                 <ComboBox Grid.Row="8" Grid.Column="1" x:Name="CB_Language" />
                 <TextBlock Classes="label" Grid.Row="9" Text="Gender" />
-                <TextBlock Grid.Row="9" Grid.Column="1" x:Name="L_Gender" VerticalAlignment="Center" Margin="0,6" />
+                <ComboBox Grid.Row="9" Grid.Column="1" x:Name="CB_Gender" />
                 <TextBlock Classes="label" Grid.Row="10" Text="Flags" />
                 <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal" Spacing="16">
                   <CheckBox x:Name="CHK_Shiny" Content="Shiny" />
@@ -160,14 +163,35 @@
           </TabItem>
 
           <TabItem Header="Moves">
-            <StackPanel Margin="4" Spacing="4">
-              <TextBlock Text="Current moves" FontWeight="Bold" />
-              <ComboBox x:Name="CB_Move1" />
-              <ComboBox x:Name="CB_Move2" />
-              <ComboBox x:Name="CB_Move3" />
-              <ComboBox x:Name="CB_Move4" />
-              <TextBlock Text="PP is restored to its maximum when saving." Opacity="0.7" />
-            </StackPanel>
+            <ScrollViewer>
+              <StackPanel Margin="4" Spacing="4">
+                <Grid ColumnDefinitions="*,110" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Text="Current moves" FontWeight="Bold" />
+                  <TextBlock Grid.Column="1" Text="PP Ups" FontWeight="Bold" Margin="8,0,0,0" />
+                  <ComboBox Grid.Row="1" x:Name="CB_Move1" />
+                  <ComboBox Grid.Row="2" x:Name="CB_Move2" />
+                  <ComboBox Grid.Row="3" x:Name="CB_Move3" />
+                  <ComboBox Grid.Row="4" x:Name="CB_Move4" />
+                  <NumericUpDown Grid.Row="1" Grid.Column="1" x:Name="NUD_PPUp1" Minimum="0" Maximum="3" FormatString="0" Margin="8,2,0,2" />
+                  <NumericUpDown Grid.Row="2" Grid.Column="1" x:Name="NUD_PPUp2" Minimum="0" Maximum="3" FormatString="0" Margin="8,2,0,2" />
+                  <NumericUpDown Grid.Row="3" Grid.Column="1" x:Name="NUD_PPUp3" Minimum="0" Maximum="3" FormatString="0" Margin="8,2,0,2" />
+                  <NumericUpDown Grid.Row="4" Grid.Column="1" x:Name="NUD_PPUp4" Minimum="0" Maximum="3" FormatString="0" Margin="8,2,0,2" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Button Content="Suggest legal moves" Click="Moves_Suggest" />
+                  <Button Content="Random legal moves" Click="Moves_Random" />
+                </StackPanel>
+                <StackPanel x:Name="RelearnPanel" Spacing="4" Margin="0,8,0,0">
+                  <TextBlock Text="Relearn moves" FontWeight="Bold" />
+                  <ComboBox x:Name="CB_Relearn1" />
+                  <ComboBox x:Name="CB_Relearn2" />
+                  <ComboBox x:Name="CB_Relearn3" />
+                  <ComboBox x:Name="CB_Relearn4" />
+                  <Button Content="Suggest relearn moves" Click="Moves_SuggestRelearn" />
+                </StackPanel>
+                <TextBlock Text="PP is refilled when the moves or PP Ups are changed." Opacity="0.7" TextWrapping="Wrap" />
+              </StackPanel>
+            </ScrollViewer>
           </TabItem>
 
           <TabItem Header="Stats">
@@ -179,6 +203,18 @@
                   <Button Content="Clear EVs" Click="Stats_ClearEVs" />
                 </StackPanel>
                 <TextBlock x:Name="L_StatTotals" Opacity="0.7" />
+                <StackPanel x:Name="HyperPanel" Margin="0,8,0,0">
+                  <TextBlock Text="Hyper Training" FontWeight="Bold" />
+                  <WrapPanel x:Name="HyperChecks" />
+                </StackPanel>
+                <Grid x:Name="ExtraStatsGrid" ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" Margin="0,8,0,0">
+                  <TextBlock Classes="label" Grid.Row="0" x:Name="L_StatNature" Text="Stat nature (mint)" />
+                  <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CB_StatNature" />
+                  <TextBlock Classes="label" Grid.Row="1" x:Name="L_TeraOriginal" Text="Tera type" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" x:Name="CB_TeraOriginal" />
+                  <TextBlock Classes="label" Grid.Row="2" x:Name="L_TeraOverride" Text="Tera type (changed)" />
+                  <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CB_TeraOverride" />
+                </Grid>
               </StackPanel>
             </ScrollViewer>
           </TabItem>

@@ -45,6 +45,7 @@ public partial class MainWindow : Window
         MoveBoxes = [CB_Move1, CB_Move2, CB_Move3, CB_Move4];
         BuildStatGrid();
         BuildDetailTabs();
+        InitEditorExtras();
 
         AddHandler(DragDrop.DropEvent, OnDrop);
         AddHandler(DragDrop.DragOverEvent, (_, e) => e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None);
@@ -566,6 +567,7 @@ public partial class MainWindow : Window
         SetSource(CB_Language, src.Languages);
         foreach (var cb in MoveBoxes)
             SetSource(cb, src.Moves);
+        PopulateExtraSources();
         Loading = false;
     }
 
@@ -659,7 +661,7 @@ public partial class MainWindow : Window
         SetValue(CB_Ball, pk.Ball);
         SetValue(CB_Language, pk.Language);
 
-        L_Gender.Text = pk.Gender switch { 0 => "♂ Male", 1 => "♀ Female", _ => "Genderless" };
+        LoadEditorExtras(pk);
         CHK_Shiny.IsChecked = pk.IsShiny;
         CHK_Egg.IsChecked = pk.IsEgg;
 
@@ -780,7 +782,7 @@ public partial class MainWindow : Window
             pk.Species = (ushort)GetValue(CB_Species);
             pk.Form = (byte)Math.Max(0, CB_Form.SelectedIndex);
             if (pk.Format >= 3)
-                pk.StatAlignment = (Nature)GetValue(CB_Nature);
+                pk.StatAlignment = (Nature)GetValue(pk.Format >= 8 ? CB_StatNature : CB_Nature);
             pk.CurrentLevel = (byte)(NUD_Level.Value ?? 1);
             var stats = pk.GetStats(pk.PersonalInfo);
             for (int i = 0; i < 6; i++)
@@ -825,6 +827,7 @@ public partial class MainWindow : Window
         bool speciesChanged = pk.Species != original.Species;
         pk.Form = (byte)Math.Max(0, CB_Form.SelectedIndex);
         ApplyIdentifiers(pk);
+        ApplyGender(pk, original);
         var language = GetValue(CB_Language);
         if (language != original.Language)
             pk.Language = language;
@@ -865,16 +868,7 @@ public partial class MainWindow : Window
                 pk.RefreshAbility(ability);
         }
 
-        Span<ushort> moves = stackalloc ushort[4];
-        Span<ushort> oldMoves = stackalloc ushort[4];
-        original.GetMoves(oldMoves);
-        for (int i = 0; i < 4; i++)
-            moves[i] = (ushort)GetValue(MoveBoxes[i]);
-        if (!moves.SequenceEqual(oldMoves))
-        {
-            pk.SetMoves(moves);
-            pk.HealPP();
-        }
+        ApplyMoves(pk, original);
 
         ApplyStatFields(pk);
 
@@ -888,6 +882,7 @@ public partial class MainWindow : Window
         if (format >= 3 && sid != original.DisplaySID)
             pk.DisplaySID = sid;
 
+        ApplyEditorExtras(pk, original);
         ApplyDetails(pk);
 
         var shiny = CHK_Shiny.IsChecked == true;

@@ -74,6 +74,7 @@ public partial class MainWindow
         CHK_EggDate = met.Add("Has egg date", new CheckBox());
         DP_EggDate = met.Add("Egg date", new CalendarDatePicker { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new(0, 2) });
         CHK_EggDate.IsCheckedChanged += (_, _) => DP_EggDate.IsEnabled = CHK_EggDate.IsChecked == true && CHK_EggDate.IsEnabled;
+        met.AddWide(Ui.Row(Ui.Button("Suggest met data", Met_Suggest), Ui.Button("Hatched from an egg (fill egg data)", Met_AsEgg)));
         met.AddWide(Ui.Header("Other"));
         CHK_Fateful = met.Add("Fateful encounter", new CheckBox());
         CB_Version.SelectionChanged += (_, _) => { if (!Loading) RefreshLocations(); };

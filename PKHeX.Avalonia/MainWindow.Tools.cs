@@ -45,6 +45,7 @@ public partial class MainWindow
         MenuDex.IsEnabled = Safe(() => PokedexEditor.IsSupported(sav));
         MenuEvents.IsEnabled = Safe(() => EventFlagEditor.IsSupported(sav));
         MenuBoxes.IsEnabled = sav.HasBox;
+        MenuGen3.IsVisible = sav is SAV3;
 
         static bool Safe(Func<bool> f)
         {
@@ -96,6 +97,15 @@ public partial class MainWindow
             return;
         var window = BatchEditorWindow.Create(sav, Math.Max(0, BoxSelector.SelectedIndex), RefreshAfterTool);
         await window.ShowDialog(this);
+    }
+
+    private async void Menu_Gen3(object? sender, RoutedEventArgs e)
+    {
+        if (SAV is not SAV3 sav)
+            return;
+        var window = Gen3Tools.Create(sav, RefreshAfterTool);
+        await window.ShowDialog(this);
+        RefreshAfterTool();
     }
 
     #region Boxes

@@ -41,8 +41,9 @@ The executable can be built with any compiler that supports C# 14.
 `PKHeX.Avalonia` is a cross-platform front end built on [Avalonia](https://avaloniaui.net/) and `PKHeX.Core`. It runs natively on Linux without Wine and covers:
 
 * Save files: open (or drag and drop), save with a `.bak` backup, browse boxes and the party.
-* Pokémon editor: species, form, nickname, level, nature, ability, item, ball, language, moves, IVs/EVs, OT/TID/SID, shiny, egg, met data (origin game, location, level, dates, fateful encounter), ribbons, memories, contest stats, friendship, Pokérus, PID/EC; legality check.
+* Pokémon editor: species, form, gender, nickname, level, nature and stat nature (mints), ability, item, ball, language, moves with PP Ups, relearn moves, legal move suggestions, IVs/EVs, Hyper Training, Tera types, OT/TID/SID, shiny, egg, met data (with suggestions), ribbons, memories, contest stats, friendship, Pokérus, PID/EC, trade evolutions; legality check.
 * Tools: trainer card, bag/items, Pokédex, event flags and work values (Gen 1–7, Let's Go, BDSP), batch editor, box sorting/clearing/export, legality report, Showdown set import/export.
+* Gen 3 tools: National Dex helper (where to find each missing species, add a legal copy), starter selection reset and legendary respawn (FireRed/LeafGreen), roaming legendary editor, Mystic/Aurora Ticket island unlock, National Pokédex unlock.
 
 Some game-specific editors from the Windows version (e.g. Gen 8+ block editors, Hall of Fame, mystery gift database) are not included.
 
