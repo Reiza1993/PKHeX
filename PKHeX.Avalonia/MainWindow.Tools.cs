@@ -108,6 +108,55 @@ public partial class MainWindow
         RefreshAfterTool();
     }
 
+    #region Updates
+
+    private async void Menu_Update(object? sender, RoutedEventArgs e)
+    {
+        var window = UpdateWindow.Create(RestartIntoUpdate);
+        await window.ShowDialog(this);
+    }
+
+    /// <summary> Starts the updated program (reopening the current save) and closes this one. </summary>
+    private async Task RestartIntoUpdate(string program)
+    {
+        if (SAV?.State.Edited == true && !await Confirm("Restart", "The current save file has unsaved changes. Restart anyway and lose them?"))
+            return;
+        var args = SAV?.Metadata.FilePath is { Length: > 0 } path ? new[] { path } : [];
+        try
+        {
+            Updater.Restart(program, args);
+        }
+        catch (Exception ex)
+        {
+            await ShowMessage("Restart", $"Couldn't start the new version automatically: {ex.Message}\n\nPlease close PKHeX and open it again.");
+            return;
+        }
+        if (SAV is not null)
+            SAV.State.Edited = false; // already confirmed above
+        if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Shutdown();
+        else
+            Close();
+    }
+
+    /// <summary> Background check at startup; only shows a status-bar hint. </summary>
+    private async Task CheckForUpdatesQuietly()
+    {
+        try
+        {
+            using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var info = await Task.Run(() => Updater.CheckAsync(cts.Token), cts.Token);
+            if (info.Available)
+                SetStatus($"Update available: {info.Summary} Use Help → Check for updates.");
+        }
+        catch
+        {
+            // offline or no git: ignore silently
+        }
+    }
+
+    #endregion
+
     #region Boxes
 
     private async void Menu_SortBoxes(object? sender, RoutedEventArgs e)

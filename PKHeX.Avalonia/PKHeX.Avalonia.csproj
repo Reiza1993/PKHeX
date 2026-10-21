@@ -22,6 +22,11 @@
     <ProjectReference Include="..\PKHeX.Core\PKHeX.Core.csproj" />
   </ItemGroup>
 
+  <!-- Release builds from GitHub Actions pass -p:BuildNumber=N; the in-app updater compares it with the latest release. -->
+  <ItemGroup Condition="'$(BuildNumber)' != ''">
+    <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)" />
+  </ItemGroup>
+
   <!-- Reuse the sprite naming logic (it only depends on PKHeX.Core). -->
   <ItemGroup>
     <Compile Include="..\PKHeX.Drawing.PokeSprite\Util\SpriteName.cs" Link="Shared\SpriteName.cs" />

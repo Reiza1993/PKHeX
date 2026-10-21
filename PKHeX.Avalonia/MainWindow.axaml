@@ -70,6 +70,8 @@
         </MenuItem>
       </MenuItem>
       <MenuItem Header="_Help">
+        <MenuItem Header="Check for _updates…" Click="Menu_Update" />
+        <Separator />
         <MenuItem Header="_About" Click="Menu_About" />
       </MenuItem>
     </Menu>

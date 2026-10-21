@@ -24,8 +24,18 @@ echo "Built: $OUT/PKHeX.Avalonia"
 if [[ $INSTALL -eq 1 ]]; then
   DEST="$HOME/.local/share/pkhex"
   mkdir -p "$DEST" "$HOME/.local/bin" "$HOME/.local/share/applications"
-  cp -r "$OUT"/. "$DEST"/
-  cp ../icon.png "$DEST/icon.png"
+  # Replace files by renaming (mv) instead of overwriting, so this also works while PKHeX is running
+  # (the in-app updater runs this script).
+  STAGE="$DEST.new"
+  rm -rf "$STAGE"
+  cp -r "$OUT" "$STAGE"
+  cp ../icon.png "$STAGE/icon.png"
+  # Remember the source checkout so Help -> Check for updates can pull and rebuild.
+  (cd .. && pwd) > "$STAGE/source-dir"
+  for f in "$STAGE"/*; do
+    mv -f "$f" "$DEST"/
+  done
+  rm -rf "$STAGE"
   ln -sf "$DEST/PKHeX.Avalonia" "$HOME/.local/bin/pkhex"
   sed -e "s|@EXEC@|$DEST/PKHeX.Avalonia|" -e "s|@ICON@|$DEST/icon.png|" pkhex.desktop.in \
     > "$HOME/.local/share/applications/pkhex.desktop"

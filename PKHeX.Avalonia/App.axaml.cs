@@ -14,6 +14,8 @@ public sealed class App : Application
     {
         // Load localized game strings (species, moves, items...) used by the editor.
         GameInfo.CurrentLanguage = GameLanguage.DefaultLanguage;
+        SaveHandlerRetroArchGBA.Register(); // RetroArch VBA-Next/gpSP .srm layout
+        Updater.CleanupOldFiles();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {

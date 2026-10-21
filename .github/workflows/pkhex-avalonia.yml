@@ -1,0 +1,54 @@
+# Builds PKHeX.Avalonia (the Linux/Windows app) and publishes it as a GitHub release.
+# The app's "Help -> Check for updates" downloads the newest "avalonia-<build>" release.
+name: PKHeX.Avalonia release
+
+on:
+  push:
+    branches: [ "claude/zen-ritchie-x5j8wz", "master", "main" ]
+    paths:
+      - "PKHeX.Avalonia/**"
+      - "PKHeX.Core/**"
+      - "PKHeX.Drawing.PokeSprite/**"
+      - "Directory.Build.props"
+      - ".github/workflows/pkhex-avalonia.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish self-contained builds
+        run: |
+          set -euo pipefail
+          for rid in linux-x64 linux-arm64 win-x64; do
+            dotnet publish PKHeX.Avalonia/PKHeX.Avalonia.csproj -c Release -r "$rid" --self-contained true \
+              -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=none \
+              -p:BuildNumber=${{ github.run_number }} -o "out/$rid"
+            cp icon.png "out/$rid/icon.png"
+          done
+          tar -czf PKHeX.Avalonia-linux-x64.tar.gz -C out/linux-x64 .
+          tar -czf PKHeX.Avalonia-linux-arm64.tar.gz -C out/linux-arm64 .
+          (cd out/win-x64 && zip -qr ../../PKHeX.Avalonia-win-x64.zip .)
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: avalonia-${{ github.run_number }}
+          name: PKHeX for Linux — build ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            Automatic build of PKHeX.Avalonia from ${{ github.ref_name }} (${{ github.sha }}).
+            Installed copies update themselves via Help → Check for updates.
+          files: |
+            PKHeX.Avalonia-linux-x64.tar.gz
+            PKHeX.Avalonia-linux-arm64.tar.gz
+            PKHeX.Avalonia-win-x64.zip

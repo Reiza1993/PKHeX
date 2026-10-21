@@ -53,6 +53,7 @@ public partial class MainWindow : Window
 
         PopulateFilteredSources();
         LoadEditor(Current);
+        Opened += async (_, _) => await CheckForUpdatesQuietly();
     }
 
     #region Messages
@@ -69,13 +70,22 @@ public partial class MainWindow : Window
 
     private static readonly FilePickerFileType AnyFile = new("All Files") { Patterns = ["*"] };
 
+    /// <summary> Common save file names: .sav, RetroArch .srm, DeSmuME .dsv, Dolphin .gci, flash .fla, BizHawk .SaveRAM, Switch/3DS "main", … </summary>
+    private static readonly FilePickerFileType SaveFiles = new("Save files (.sav, .srm, .dsv, .gci, …)")
+    {
+        Patterns = ["*.sav", "*.srm", "*.dsv", "*.gci", "*.fla", "*.dat", "*.bin", "*.SaveRAM", "*.raw", "*.bak", "main"],
+    };
+
+    private static readonly FilePickerFileType SavExtension = new("Save file (.sav)") { Patterns = ["*.sav"] };
+    private static readonly FilePickerFileType SrmExtension = new("RetroArch save file (.srm)") { Patterns = ["*.srm"] };
+
     private async void Menu_Open(object? sender, RoutedEventArgs e)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Open save file or Pokémon file",
             AllowMultiple = false,
-            FileTypeFilter = [AnyFile],
+            FileTypeFilter = [SaveFiles, AnyFile],
         });
         var path = files.FirstOrDefault()?.TryGetLocalPath();
         if (path is not null)
@@ -166,6 +176,7 @@ public partial class MainWindow : Window
             SuggestedFileName = meta.FileName ?? $"save{SAV.Extension}",
             SuggestedStartLocation = meta.FileFolder is { } dir ? await StorageProvider.TryGetFolderFromPathAsync(dir) : null,
             ShowOverwritePrompt = true,
+            FileTypeChoices = IsSrm(meta.FileName) ? [SrmExtension, SavExtension, AnyFile] : [SavExtension, SrmExtension, AnyFile],
         });
         var path = file?.TryGetLocalPath();
         if (path is not null)
@@ -184,6 +195,9 @@ public partial class MainWindow : Window
                 File.Copy(path, bak);
 
             var flags = SAV.Metadata.GetSuggestedFlags(Path.GetExtension(path.AsSpan()));
+            // A RetroArch .srm with extra trailing data, saved as something else: drop the trailer.
+            if (SAV.Metadata.HasFooter && IsSrm(SAV.Metadata.FileName) && !IsSrm(path))
+                flags |= BinaryExportSetting.ExcludeFooter;
             var data = SAV.Write(flags);
             await File.WriteAllBytesAsync(path, data);
             SAV.State.Edited = false;
@@ -196,6 +210,8 @@ public partial class MainWindow : Window
             await ShowMessage("Save", $"Unable to write the file:\n{ex.Message}");
         }
     }
+
+    private static bool IsSrm(string? fileName) => fileName?.EndsWith(".srm", StringComparison.OrdinalIgnoreCase) == true;
 
     private async void Menu_Exit(object? sender, RoutedEventArgs e)
     {
