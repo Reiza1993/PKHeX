@@ -12,8 +12,9 @@ namespace PKHeX.Avalonia;
 /// </summary>
 public static class UpdateWindow
 {
+    /// <param name="beforeUpdate">Asked before installing (e.g. about unsaved changes); return false to cancel.</param>
     /// <param name="restart">Called with the program to start once the update is installed.</param>
-    public static Window Create(Func<string, Task> restart)
+    public static Window Create(Func<Task<bool>> beforeUpdate, Func<string, Task> restart)
     {
         var window = new Window
         {
@@ -47,6 +48,7 @@ public static class UpdateWindow
         Updater.UpdateInfo? info = null;
         string? program = null;
         bool busy = false;
+        bool installed = false;
 
         async Task Check()
         {
@@ -82,7 +84,7 @@ public static class UpdateWindow
         check.Click += async (_, _) => await Check();
         update.Click += async (_, _) =>
         {
-            if (info is null)
+            if (info is null || !await beforeUpdate())
                 return;
             busy = true;
             check.IsEnabled = update.IsEnabled = close.IsEnabled = false;
@@ -92,8 +94,10 @@ public static class UpdateWindow
             {
                 var current = info;
                 program = await Task.Run(() => Updater.ApplyAsync(current, Log));
-                summary.Text = "Update installed. Restart PKHeX to use the new version.";
+                summary.Text = "Update installed. PKHeX needs to restart now to use the new version.";
                 restartNow.IsVisible = true;
+                installed = true;
+                close.IsVisible = false; // the old program files were replaced: keep using this copy is not safe
             }
             catch (Exception ex)
             {
@@ -114,7 +118,7 @@ public static class UpdateWindow
                 await restart(program);
         };
         close.Click += (_, _) => window.Close();
-        window.Closing += (_, e) => e.Cancel = busy;
+        window.Closing += (_, e) => e.Cancel = busy || installed;
         window.Opened += async (_, _) => await Check();
 
         var panel = new DockPanel { Margin = new(14) };

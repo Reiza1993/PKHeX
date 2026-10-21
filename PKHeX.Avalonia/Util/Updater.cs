@@ -192,8 +192,20 @@ public static class Updater
     /// Downloads/builds and installs the update. Progress lines are reported through <paramref name="log"/>.
     /// Returns the path of the program to start afterwards.
     /// </summary>
-    public static Task<string> ApplyAsync(UpdateInfo info, Action<string> log, CancellationToken token = default)
-        => CurrentMode == Mode.Source ? ApplySourceAsync(log, token) : ApplyReleaseAsync(info.Asset!, log, token);
+    public static async Task<string> ApplyAsync(UpdateInfo info, Action<string> log, CancellationToken token = default)
+    {
+        // The app is a single-file bundle: once its file is replaced, parts of it that haven't been loaded yet
+        // can't be loaded anymore. Make sure everything needed to start the new version is loaded first.
+        await WarmUpProcessSupportAsync(token);
+        return CurrentMode == Mode.Source
+            ? await ApplySourceAsync(log, token)
+            : await ApplyReleaseAsync(info.Asset!, log, token);
+    }
+
+    private static Task WarmUpProcessSupportAsync(CancellationToken token)
+        => OperatingSystem.IsWindows()
+            ? RunAsync("cmd.exe", ["/c", "exit", "0"], null, token)
+            : RunAsync("/bin/sh", ["-c", "true"], null, token);
 
     private static async Task<string> ApplySourceAsync(Action<string> log, CancellationToken token)
     {

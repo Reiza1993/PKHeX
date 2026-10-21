@@ -112,15 +112,21 @@ public partial class MainWindow
 
     private async void Menu_Update(object? sender, RoutedEventArgs e)
     {
-        var window = UpdateWindow.Create(RestartIntoUpdate);
+        var window = UpdateWindow.Create(ConfirmUpdate, RestartIntoUpdate);
         await window.ShowDialog(this);
+    }
+
+    /// <summary> PKHeX restarts right after an update, so unsaved changes must be dealt with first. </summary>
+    private async Task<bool> ConfirmUpdate()
+    {
+        if (SAV?.State.Edited != true)
+            return true;
+        return await Confirm("Update", "Your save file has unsaved changes, and PKHeX will restart after the update.\n\nChoose No, close this window and use File → Save first — or Yes to update anyway and lose the changes.");
     }
 
     /// <summary> Starts the updated program (reopening the current save) and closes this one. </summary>
     private async Task RestartIntoUpdate(string program)
     {
-        if (SAV?.State.Edited == true && !await Confirm("Restart", "The current save file has unsaved changes. Restart anyway and lose them?"))
-            return;
         var args = SAV?.Metadata.FilePath is { Length: > 0 } path ? new[] { path } : [];
         try
         {
