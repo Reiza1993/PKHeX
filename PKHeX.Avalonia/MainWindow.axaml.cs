@@ -222,8 +222,7 @@ public partial class MainWindow : Window
 
     private async void Menu_About(object? sender, RoutedEventArgs e)
     {
-        var version = typeof(SaveFile).Assembly.GetName().Version;
-        await ShowMessage("About", $"PKHeX (Avalonia) — a cross-platform front end for PKHeX.Core {version}.\n\n" +
+        await ShowMessage("About", $"PKHeX (Avalonia) — a cross-platform front end for PKHeX.Core.\nVersion: {Updater.VersionText}\n\n" +
                                     "Runs natively on Linux (Ubuntu), macOS and Windows.\n\n" +
                                     "PKHeX is developed by Kaphotics and contributors, licensed under GPLv3.");
     }

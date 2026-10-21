@@ -57,6 +57,10 @@ pkhex /path/to/save                          # or open it from the applications 
 
 To run without installing: `dotnet run --project PKHeX.Avalonia -c Release`.
 
+**Updating:** use *Help → Check for updates* in the app. If you installed with `build-linux.sh --install`, it pulls the latest commits from your checkout and rebuilds (needs `git` and the .NET SDK). Copies downloaded from the GitHub releases (built by `.github/workflows/pkhex-avalonia.yml`) download the newest release instead.
+
+**Save file types:** `.sav`, RetroArch `.srm` (mGBA and VBA-Next/gpSP layouts), `.dsv`, `.gci` and the other formats PKHeX.Core recognises can be opened and saved back in the same format.
+
 ### Build Configurations
 
 Use the Debug or Release build configurations when building. There isn't any platform specific code to worry about!
