@@ -31,6 +31,12 @@ public static class Gen3Tools
         };
         var ctx = new Context(sav, window, onChanged);
         var tabs = new TabControl();
+        ctx.Tabs = tabs;
+        tabs.SelectionChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Source, tabs)) // ignore selections bubbling up from lists inside the tabs
+                ctx.RefreshAll();
+        };
         tabs.Items.Add(new TabItem { Header = "Dex helper", Content = DexHelper(ctx) });
         tabs.Items.Add(new TabItem { Header = "Starters", Content = Starters(ctx) });
         tabs.Items.Add(new TabItem { Header = "Legendaries", Content = Legendaries(ctx) });
@@ -50,6 +56,25 @@ public static class Gen3Tools
     private sealed record Context(SAV3 Sav, Window Window, Action OnChanged)
     {
         public bool IsFRLG => Sav is SAV3FRLG;
+        public List<Action> Refreshers { get; } = [];
+        public TabControl? Tabs { get; set; }
+
+        public void RefreshAll()
+        {
+            foreach (var r in Refreshers)
+                r();
+        }
+
+        public void SelectTab(string header)
+        {
+            if (Tabs is null)
+                return;
+            foreach (var item in Tabs.Items)
+            {
+                if (item is TabItem { Header: string h } t && h == header)
+                    Tabs.SelectedItem = t;
+            }
+        }
 
         public void Changed()
         {
@@ -82,17 +107,53 @@ public static class Gen3Tools
 
     private const int VarStarter = 0x31;   // VAR_STARTER_MON (0 Bulbasaur, 1 Squirtle, 2 Charmander)
     private const int VarOaksLab = 0x55;   // VAR_MAP_SCENE_PALLET_TOWN_PROFESSOR_OAKS_LAB
-    private const int VarStashLab = 0xB6;  // VAR_0x40B6 (unused by the game): keeps the original lab value during a reset
-    private const int VarStashStarter = 0xB7; // VAR_0x40B7 (unused by the game): keeps the original starter during a reset
-    private const ushort StashMagic = 0xA500;
+    private const int VarCelio = 0x76;     // VAR_MAP_SCENE_ONE_ISLAND_POKEMON_CENTER_1F
+    private const int FlagGotPokemon = 0x828;    // FLAG_SYS_POKEMON_GET: received a starter
+    private const int FlagGotPokedex = 0x829;    // FLAG_SYS_POKEDEX_GET
+    private const int FlagNationalDex = 0x840;   // FLAG_SYS_NATIONAL_DEX
+    private const int FlagBeatLabRival = 0x258;  // FLAG_BEAT_RIVAL_IN_OAKS_LAB
+    private const int FlagRecoveredSapphire = 0x2DC; // FLAG_RECOVERED_SAPPHIRE
+    private const int FlagHideCelio = 0x073;     // FLAG_HIDE_ONE_ISLAND_POKECENTER_CELIO
+    private const int ItemSapphire = 374;        // ITEM_SAPPHIRE
+
+    // An earlier version of this tool kept a copy of the original progress in these two variables,
+    // which turned out to be VAR_MYSTERY_GIFT_1/2. Clean them up if that copy is still there.
+    private const int VarMysteryGift1 = 0xB6, VarMysteryGift2 = 0xB7;
 
     private static readonly string[] StarterNames = ["Bulbasaur", "Squirtle", "Charmander"];
+    private static readonly string[] BeastNames = ["Entei", "Raikou", "Suicune"]; // per starter
+    private static readonly ushort[] BeastSpecies = [(ushort)Species.Entei, (ushort)Species.Raikou, (ushort)Species.Suicune];
 
     private static readonly string[] LabStates =
     [
         "0: not visited yet", "1: Oak walks you in", "2: choosing a starter", "3: starter chosen (rival battle next)",
         "4: rival beaten", "5", "6: Pokédex received", "7", "8", "9: all events done",
     ];
+
+    private static string StarterName(int value) => (uint)value < StarterNames.Length ? StarterNames[value] : $"value {value}";
+    private static string BeastFor(int starter) => (uint)starter < BeastNames.Length ? BeastNames[starter] : "Raikou";
+    private static string LabName(int value) => (uint)value < LabStates.Length ? LabStates[value] : value.ToString();
+
+    /// <summary> The Oak's Lab value that matches the player's story progress, worked out from the game's own flags. </summary>
+    private static int GetProgressLabValue(SAV3 sav)
+    {
+        if (sav.GetEventFlag(FlagNationalDex))
+            return 9;
+        if (sav.GetEventFlag(FlagGotPokedex))
+            return 6;
+        if (sav.GetEventFlag(FlagBeatLabRival))
+            return 4;
+        return 3;
+    }
+
+    private static void CleanupOldStash(SAV3 sav)
+    {
+        foreach (var v in new[] { VarMysteryGift1, VarMysteryGift2 })
+        {
+            if ((sav.GetWork(v) & 0xFF00) == 0xA500)
+                sav.SetWork(v, 0);
+        }
+    }
 
     private static Control Starters(Context ctx)
     {
@@ -103,31 +164,26 @@ public static class Gen3Tools
         var finish = new Button { Content = "Finish: restore my story progress" };
         var reset = new Button { Content = "Reset starter selection" };
 
-        bool Pending() => (sav.GetWork(VarStashLab) & 0xFF00) == StashMagic;
         void Refresh()
         {
             var lab = sav.GetWork(VarOaksLab);
             var starter = sav.GetWork(VarStarter);
-            var labText = lab < LabStates.Length ? LabStates[lab] : lab.ToString();
-            var starterText = starter < StarterNames.Length ? StarterNames[starter] : starter.ToString();
-            status.Text = $"Oak's Lab: {labText}\nStarter on record: {starterText}" +
-                          (Pending() ? $"\nReset in progress — original progress saved ({LabStates[Math.Min(sav.GetWork(VarStashLab) & 0xFF, LabStates.Length - 1)]}, {StarterNames[Math.Min(sav.GetWork(VarStashStarter) & 0xFF, 2)]})." : string.Empty);
-            finish.IsVisible = Pending();
+            var target = GetProgressLabValue(sav);
+            bool inReset = sav.GetEventFlag(FlagGotPokemon) && lab < target;
+            status.Text = $"Oak's Lab: {LabName(lab)}\nStarter on record: {StarterName(starter)} (roaming beast for this starter: {BeastFor(starter)})" +
+                          (inReset ? $"\nReset in progress — \"Finish\" will set Oak's Lab back to {LabName(target)}." : string.Empty);
+            finish.IsVisible = inReset;
         }
+        ctx.Refreshers.Add(Refresh);
 
         reset.Click += async (_, _) =>
         {
-            var lab = sav.GetWork(VarOaksLab);
-            if (!Pending())
+            if (!sav.GetEventFlag(FlagGotPokemon))
             {
-                if (lab < 3)
-                {
-                    await Ui.ShowMessage(ctx.Window, "Starter reset", "You haven't chosen a starter yet, so there is nothing to reset. Just pick one in Oak's Lab.");
-                    return;
-                }
-                sav.SetWork(VarStashLab, (ushort)(StashMagic | lab));
-                sav.SetWork(VarStashStarter, (ushort)(StashMagic | sav.GetWork(VarStarter)));
+                await Ui.ShowMessage(ctx.Window, "Starter reset", "You haven't received a starter yet, so there is nothing to reset. Just pick one in Oak's Lab.");
+                return;
             }
+            CleanupOldStash(sav);
             sav.SetWork(VarOaksLab, 2);         // starter selection open
             sav.SetEventFlag(0x028, false);       // show Bulbasaur's ball
             sav.SetEventFlag(0x029, false);       // show Squirtle's ball
@@ -135,34 +191,36 @@ public static class Gen3Tools
             sav.SetEventFlag(0x02B, false);       // show Prof. Oak in his lab
             sav.SetEventFlag(0x02D, false);       // show Blue in the lab (he takes a ball after you)
             ctx.Changed();
-            Refresh();
+            ctx.RefreshAll();
             await Ui.ShowMessage(ctx.Window, "Starter reset", "The three Poké Balls are back on Oak's table. Now:\n\n" +
                 "1. Click File → Save, and load the save in your game.\n" +
                 "2. Go into Oak's Lab (if you're already inside, leave and come back in).\n" +
                 "3. Pick a ball. Blue takes another one, and battles you on your way out.\n" +
                 "4. Don't talk to Prof. Oak until you've pressed \"Finish\" (he would hand out the Pokédex again).\n" +
                 "5. Save in-game, reopen the save here, and press Reset again for the next starter (3 rounds gets you all three).\n" +
-                "6. When you're done, press \"Finish\" so your story progress and original starter come back.");
+                "6. When you're done, press \"Finish\". The starter you picked LAST counts as your starter from then on " +
+                "(Blue's team and the roaming beast follow it).");
         };
 
         finish.Click += async (_, _) =>
         {
-            if (!Pending())
-                return;
-            sav.SetWork(VarOaksLab, (ushort)(sav.GetWork(VarStashLab) & 0xFF));
-            sav.SetWork(VarStarter, (ushort)(sav.GetWork(VarStashStarter) & 0xFF));
-            sav.SetWork(VarStashLab, 0);
-            sav.SetWork(VarStashStarter, 0);
+            var target = GetProgressLabValue(sav);
+            sav.SetWork(VarOaksLab, (ushort)target);
+            CleanupOldStash(sav);
             ctx.Changed();
-            Refresh();
-            await Ui.ShowMessage(ctx.Window, "Starter reset", "Story progress and your original starter are restored (this keeps your rival's team and the roaming beast matched to your first choice). Click File → Save.");
+            ctx.RefreshAll();
+            var starter = sav.GetWork(VarStarter);
+            await Ui.ShowMessage(ctx.Window, "Starter reset", $"Story progress restored (Oak's Lab: {LabName(target)}).\n\n" +
+                $"Your starter on record is now {StarterName(starter)}, so the roaming beast for you is {BeastFor(starter)}. " +
+                "To get that beast roaming, see the Roamer tab. Click File → Save.");
         };
 
         Refresh();
         return Page(
-            Explain("Lets you pick the starters again so you can collect all three (Bulbasaur, Squirtle and Charmander).\n\n" +
+            Explain("Lets you pick the starters again so you can collect all three (Bulbasaur, Squirtle and Charmander), " +
+                    "or switch your starter to change which legendary beast roams (Bulbasaur → Entei, Squirtle → Raikou, Charmander → Suicune).\n\n" +
                     "How it works: Prof. Oak's Lab has a progress value; at 2 the Poké Balls can be picked. Reset puts it back to 2 and makes the balls, Oak and Blue reappear. " +
-                    "Each pick gives one starter (Blue takes another ball), so do it up to three times. Your real progress is stored safely in the save and put back by \"Finish\". " +
+                    "Each pick gives one starter (Blue takes another ball). \"Finish\" puts your story progress back, worked out from the game's own story flags (Pokédex, National Pokédex, rival beaten), so nothing extra is stored in your save. " +
                     "Try it on a copy of your save first."),
             status, Ui.Row(reset, finish));
     }
@@ -237,7 +295,7 @@ public static class Gen3Tools
         var roamer = new Roamer3(sav.LargeBlock);
         var form = new Ui.Form();
 
-        var species = form.Add("Species", Ui.Combo(GameInfo.FilteredSources.Species));
+        var species = form.Add("Species", new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeight.SemiBold });
         var level = form.Add("Level", Ui.Number(1, 100));
         var hp = form.Add("Current HP", Ui.Number(0, 999));
         var active = form.Add("Roaming (active)", new CheckBox());
@@ -257,20 +315,6 @@ public static class Gen3Tools
             shiny.Text = !ok ? "(invalid PID)" : Roamer3.IsShiny(p, sav) ? "★ Yes" : "No";
         }
 
-        void Load()
-        {
-            Ui.SetValue(species, roamer.Species);
-            level.Value = roamer.CurrentLevel;
-            hp.Value = roamer.HP_Current;
-            active.IsChecked = roamer.IsActive;
-            pid.Text = roamer.PID.ToString("X8");
-            var v = roamer.IVs;
-            for (int i = 0; i < 6; i++)
-                ivs[i].Value = v[i];
-            UpdateShiny();
-            UpdateGlitch();
-        }
-
         void UpdateGlitch()
         {
             if (!roamer.IsGlitched)
@@ -284,13 +328,28 @@ public static class Gen3Tools
                           $"HP {g[0]}, Atk {g[1]}, Def {g[2]}, Spe {g[3]}, SpA {g[4]}, SpD {g[5]}.";
         }
 
+        void Load()
+        {
+            var names = GameInfo.Strings.specieslist;
+            species.Text = roamer.Species == 0 ? "(none yet — the roaming event hasn't happened)" : names[roamer.Species];
+            level.Value = Math.Max((byte)1, roamer.CurrentLevel);
+            hp.Value = roamer.HP_Current;
+            active.IsChecked = roamer.IsActive;
+            pid.Text = roamer.PID.ToString("X8");
+            var v = roamer.IVs;
+            for (int i = 0; i < 6; i++)
+                ivs[i].Value = v[i];
+            UpdateShiny();
+            UpdateGlitch();
+        }
+
         foreach (var nud in ivs)
             nud.ValueChanged += (_, _) => UpdateGlitch();
         pid.TextChanged += (_, _) => UpdateShiny();
 
         ushort MaxHP()
         {
-            var pk = new PK3 { Species = (ushort)Ui.GetValue(species) };
+            var pk = new PK3 { Species = roamer.Species };
             pk.CurrentLevel = (byte)(level.Value ?? 50);
             pk.SetIVs(ToRoamerOrder(ivs));
             return pk.GetStats(pk.PersonalInfo)[0];
@@ -312,12 +371,16 @@ public static class Gen3Tools
         });
         var save = Ui.Button("Save roamer", async (_, _) =>
         {
+            if (roamer.Species == 0)
+            {
+                await Ui.ShowMessage(ctx.Window, "Roamer", "There is no roaming Pokémon yet. It's created by the game when the roaming event happens.");
+                return;
+            }
             if (!uint.TryParse(pid.Text, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var p))
             {
                 await Ui.ShowMessage(ctx.Window, "Roamer", "The PID must be 8 hexadecimal digits.");
                 return;
             }
-            roamer.Species = (ushort)Ui.GetValue(species);
             roamer.CurrentLevel = (byte)(level.Value ?? 50);
             roamer.PID = p;
             roamer.IVs = ToRoamerOrder(ivs);
@@ -334,11 +397,61 @@ public static class Gen3Tools
         });
 
         Load();
-        var defaultBeast = ctx.IsFRLG ? "Entei if you chose Bulbasaur, Raikou for Squirtle, Suicune for Charmander" : "Latios or Latias";
+        ctx.Refreshers.Add(Load);
+
+        if (!ctx.IsFRLG)
+        {
+            return Page(
+                Explain("The roaming Pokémon (Latios or Latias) appears after the Hall of Fame. Its species is set by the game. " +
+                        "To make it roam again after you caught or knocked it out, tick \"Roaming\" and save — HP is refilled automatically."),
+                form.Grid, Ui.Row(save, heal, reroll, makeShiny));
+        }
+
+        // FireRed/LeafGreen: change the beast the way the game does it.
+        var beastStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
+        var toStarters = Ui.Button("Step 1: Reset starter selection (opens the Starters tab)", (_, _) => ctx.SelectTab("Starters"));
+        var redoSapphire = new Button { Content = "Step 2: Let me give Celio the Sapphire again" };
+
+        void RefreshBeast()
+        {
+            var starter = sav.GetWork(VarStarter);
+            var celio = sav.GetWork(VarCelio);
+            var current = roamer.Species == 0 ? "none yet" : GameInfo.Strings.specieslist[roamer.Species];
+            string sapphire = celio >= 6
+                ? "Sapphire already given to Celio (the beast was created then)."
+                : sav.GetEventFlag(FlagRecoveredSapphire) ? "Sapphire recovered — give it to Celio in the One Island Pokémon Center." : "Sapphire not recovered yet.";
+            beastStatus.Text = $"Starter on record: {StarterName(starter)} → the game will create: {BeastFor(starter)}\n" +
+                               $"Roaming now: {current}{(roamer.IsActive ? " (roaming)" : roamer.Species != 0 ? " (caught / not roaming)" : string.Empty)}\n" +
+                               sapphire;
+            redoSapphire.IsEnabled = celio >= 6;
+        }
+        ctx.Refreshers.Add(RefreshBeast);
+
+        redoSapphire.Click += async (_, _) =>
+        {
+            sav.SetWork(VarCelio, 5);                   // "Received Rainbow Pass": Celio is waiting for the Sapphire again
+            sav.SetEventFlag(FlagRecoveredSapphire, true);
+            sav.SetEventFlag(FlagHideCelio, false);       // make sure Celio is there
+            var item = GiveKeyItems(sav, (ItemSapphire, "Sapphire"));
+            ctx.Changed();
+            ctx.RefreshAll();
+            var starter = sav.GetWork(VarStarter);
+            await Ui.ShowMessage(ctx.Window, "Roaming beast", $"Celio is waiting for the Sapphire again. {item}\n\n" +
+                "1. Click File → Save and load the save in your game.\n" +
+                "2. Go to the One Island Pokémon Center and talk to Celio — you hand over the Sapphire again.\n" +
+                $"3. The game then creates a new roaming beast from your starter on record: {BeastFor(starter)} ({StarterName(starter)}). " +
+                "It replaces the one that was roaming before.");
+        };
+
+        RefreshBeast();
         return Page(
-            Explain("Edits the Pokémon that roams the routes after the story event (FireRed/LeafGreen: after giving Celio the Sapphire; Ruby/Sapphire/Emerald: after the Hall of Fame). " +
-                    $"Normally it's {defaultBeast}.\n\n" +
-                    "To make it roam again after you caught or knocked it out, tick \"Roaming\" and save — HP is refilled automatically. You can also change the species (e.g. to get another beast), make it shiny, or set its IVs."),
+            Explain("Which legendary beast roams Kanto is decided by the game when you give Celio the Sapphire, based on your starter: " +
+                    "Bulbasaur → Entei, Squirtle → Raikou, Charmander → Suicune.\n\n" +
+                    "To get a different beast: (1) reset the starter selection and pick the starter for the beast you want, press Finish; " +
+                    "(2) press \"Let me give Celio the Sapphire again\", then hand him the Sapphire in your game."),
+            beastStatus, toStarters, redoSapphire,
+            Ui.Header("Current roaming Pokémon"),
+            Explain("To make it roam again after you caught or knocked it out, tick \"Roaming\" and save — HP is refilled automatically."),
             form.Grid, Ui.Row(save, heal, reroll, makeShiny));
     }
 
