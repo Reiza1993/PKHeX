@@ -426,15 +426,21 @@ public partial class MainWindow : Window
 
     private async void Slot_Apply(object? sender, RoutedEventArgs e)
     {
-        if (SAV is not { } sav || Selected is not { } s)
-            return;
         var pk = GetEditedEntity();
         if (pk.Species == 0)
         {
             await ShowMessage("Save to slot", "Choose a species first.");
             return;
         }
+        if (await WriteToSelectedSlot(pk))
+            SetStatus("Pokémon written to the selected slot. Use File → Save to write the save file.");
+    }
 
+    /// <summary> Writes <paramref name="pk"/> into the selected party/box slot. Returns false if nothing was written. </summary>
+    private async Task<bool> WriteToSelectedSlot(PKM pk)
+    {
+        if (SAV is not { } sav || Selected is not { } s)
+            return false;
         if (s.Party)
         {
             var index = Math.Min(s.Slot, sav.PartyCount);
@@ -447,7 +453,7 @@ public partial class MainWindow : Window
             if (sav.IsBoxSlotOverwriteProtected(s.Box, s.Slot))
             {
                 await ShowMessage("Save to slot", "This slot is locked or overwrite-protected.");
-                return;
+                return false;
             }
             sav.SetBoxSlotAtIndex(pk, s.Box, s.Slot);
             if (BoxSelector.SelectedIndex != s.Box)
@@ -456,7 +462,7 @@ public partial class MainWindow : Window
         }
         sav.State.Edited = true;
         LoadEditor(pk);
-        SetStatus("Pokémon written to the selected slot. Use File → Save to write the save file.");
+        return true;
     }
 
     private async void Slot_Delete(object? sender, RoutedEventArgs e)
@@ -935,6 +941,7 @@ public partial class MainWindow : Window
         PreviewSprite.Source = Sprites.GetSprite(pk);
         BallSprite.Source = pk.Format >= 3 && pk.Species != 0 ? Sprites.GetBall(pk.Ball) : null;
         PreviewTitle.Text = pk.Species == 0 ? "(empty)" : GetEntitySummary(pk);
+        UpdateEvolveButton(pk);
         if (pk.Species == 0)
         {
             LegalityText.Text = string.Empty;

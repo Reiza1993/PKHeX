@@ -178,6 +178,40 @@ public static class Ui
     }
 
     /// <summary>
+    /// Asks the user to pick one of several options. Returns the chosen index, or -1 if cancelled.
+    /// </summary>
+    public static async Task<int> Choose(Window owner, string title, string message, IReadOnlyList<string> options)
+    {
+        int result = -1;
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 480,
+            SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+        };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0, 12, 0, 0) };
+        for (int i = 0; i < options.Count; i++)
+        {
+            int index = i;
+            var b = new Button { Content = options[i], IsDefault = i == 0 };
+            b.Click += (_, _) => { result = index; dialog.Close(); };
+            buttons.Children.Add(b);
+        }
+        var cancel = new Button { Content = "Cancel", IsCancel = true };
+        cancel.Click += (_, _) => dialog.Close();
+        buttons.Children.Add(cancel);
+        var panel = new DockPanel { Margin = new(16) };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        panel.Children.Add(buttons);
+        panel.Children.Add(new TextBlock { Text = message, TextWrapping = TextWrapping.Wrap });
+        dialog.Content = panel;
+        await dialog.ShowDialog(owner);
+        return result;
+    }
+
+    /// <summary>
     /// Shows a multi-line text box. Returns the entered text, or null if cancelled.
     /// </summary>
     public static async Task<string?> PromptText(Window owner, string title, string description, string initial = "", bool readOnly = false)

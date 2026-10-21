@@ -118,13 +118,15 @@
 
         <Border DockPanel.Dock="Top" Padding="8" CornerRadius="4" Margin="0,0,0,8"
                 Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
-          <Grid ColumnDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto">
             <Image Grid.Column="0" x:Name="PreviewSprite" Width="68" Height="56" Margin="0,0,8,0" />
             <StackPanel Grid.Column="1" VerticalAlignment="Center">
               <TextBlock x:Name="PreviewTitle" FontWeight="Bold" FontSize="16" />
               <TextBlock x:Name="LegalityText" />
             </StackPanel>
-            <Image Grid.Column="2" x:Name="BallSprite" Width="32" Height="32" />
+            <Button Grid.Column="2" x:Name="BtnEvolve" Content="Evolve" IsVisible="False" Click="Menu_TradeEvolve"
+                    VerticalAlignment="Center" Margin="0,0,12,0" />
+            <Image Grid.Column="3" x:Name="BallSprite" Width="32" Height="32" />
           </Grid>
         </Border>
 

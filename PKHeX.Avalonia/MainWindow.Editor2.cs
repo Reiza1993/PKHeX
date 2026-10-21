@@ -270,43 +270,74 @@ public partial class MainWindow
         (Species.Pumpkaboo, null, Species.Gourgeist),
     ];
 
+    private List<(Species From, string? Item, Species To)> GetTradeEvolutions(PKM pk)
+        => [.. TradeEvolutions.Where(z => (ushort)z.From == pk.Species && (ushort)z.To <= pk.MaxSpeciesID)];
+
+    private void UpdateEvolveButton(PKM pk)
+    {
+        var options = pk.Species == 0 || pk.IsEgg ? [] : GetTradeEvolutions(pk);
+        BtnEvolve.IsVisible = options.Count != 0;
+        if (options.Count != 0)
+        {
+            var names = GameInfo.Strings.specieslist;
+            BtnEvolve.Content = options.Count == 1 ? $"Evolve → {names[(int)options[0].To]}" : "Evolve…";
+            ToolTip.SetTip(BtnEvolve, "This Pokémon evolves by trading. Click to evolve it without a trade.");
+        }
+    }
+
+    private static string NormalizeItem(string x) => new string(x.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+    /// <summary>
+    /// Evolves a Pokémon that normally needs a trade (optionally while holding an item), and saves it to its slot.
+    /// </summary>
     private async void Menu_TradeEvolve(object? sender, RoutedEventArgs e)
     {
         var pk = GetEditedEntity();
+        var names = GameInfo.Strings.specieslist;
         if (pk.Species == 0)
         {
-            await ShowMessage("Evolve by trade", "There is no Pokémon in the editor.");
+            await ShowMessage("Evolve", "There is no Pokémon in the editor.");
             return;
         }
         if (pk.IsEgg)
         {
-            await ShowMessage("Evolve by trade", "Eggs can't evolve.");
+            await ShowMessage("Evolve", "Eggs can't evolve.");
+            return;
+        }
+        var options = GetTradeEvolutions(pk);
+        if (options.Count == 0)
+        {
+            await ShowMessage("Evolve", $"{names[pk.Species]} doesn't evolve by trading. Level-up and stone evolutions happen in the game as usual.");
             return;
         }
 
         var items = GameInfo.Strings.GetItemStrings(pk.Context, pk.Version);
         var held = (uint)pk.HeldItem < items.Length ? items[pk.HeldItem] : string.Empty;
-        var options = TradeEvolutions.Where(z => (ushort)z.From == pk.Species && (ushort)z.To <= pk.MaxSpeciesID).ToList();
-        if (options.Count == 0)
-        {
-            await ShowMessage("Evolve by trade", $"{GameInfo.Strings.specieslist[pk.Species]} doesn't evolve by trading.");
-            return;
-        }
+        bool Holds(string? item) => item is null || NormalizeItem(item) == NormalizeItem(held);
 
-        static string Norm(string x) => new string(x.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
-        var match = options.FirstOrDefault(z => z.Item is null || Norm(z.Item) == Norm(held));
-        if (match == default)
+        // Pick the evolution: the one matching the held item, else let the user choose.
+        var choice = options.FindIndex(z => z.Item is not null && Holds(z.Item));
+        if (choice < 0 && options is [{ Item: null }])
+            choice = 0; // e.g. Kadabra → Alakazam: nothing to choose
+        if (choice < 0)
         {
-            var needed = string.Join(" or ", options.Select(z => $"{z.Item} (→ {GameInfo.Strings.specieslist[(int)z.To]})"));
-            await ShowMessage("Evolve by trade", $"{GameInfo.Strings.specieslist[pk.Species]} must hold {needed} to evolve by trade. Give it the item on the Main tab first.");
-            return;
+            var labels = options.Select(z => z.Item is null ? $"{names[(int)z.To]}" : $"{names[(int)z.To]} ({z.Item})").ToList();
+            var itemNote = options.Any(z => z.Item is not null)
+                ? "\n\nIn the game it must hold the item shown while being traded. Here the item is treated as used up; nothing is taken from your bag."
+                : string.Empty;
+            var name = pk.IsNicknamed ? $"{pk.Nickname} ({names[pk.Species]})" : names[pk.Species];
+            choice = await Ui.Choose(this, "Evolve", $"Evolve {name} into:{itemNote}", labels);
+            if (choice < 0)
+                return;
         }
+        var evo = options[choice];
 
+        var from = names[pk.Species];
         bool nicknamed = pk.IsNicknamed;
         int abilitySlot = pk.AbilityNumber switch { 2 => 1, 4 => 2, _ => 0 };
-        pk.Species = (ushort)match.To;
-        if (match.Item is not null)
-            pk.HeldItem = 0; // the item is used up
+        pk.Species = (ushort)evo.To;
+        if (evo.Item is not null && Holds(evo.Item))
+            pk.HeldItem = 0; // the held item is used up by the evolution
         if (pk.Format >= 3)
             pk.RefreshAbility(abilitySlot);
         if (!nicknamed)
@@ -314,8 +345,20 @@ public partial class MainWindow
         if (pk.PartyStatsPresent)
             pk.ResetPartyStats();
         pk.RefreshChecksum();
-        LoadEditor(pk);
-        SetStatus($"Evolved into {GameInfo.Strings.specieslist[pk.Species]}. Click \"Save to selected slot\" to keep it.");
+
+        var to = names[pk.Species];
+        var dexNote = SAV is SAV3FRLG { NationalDex: false } && pk.Species > 151
+            ? " Note: FireRed/LeafGreen only shows non-Kanto Pokémon in the Pokédex once you have the National Pokédex."
+            : string.Empty;
+        if (await WriteToSelectedSlot(pk))
+        {
+            SetStatus($"{from} evolved into {to} and was saved to its slot (and registered in the Pokédex). Use File → Save to write the save file.{dexNote}");
+        }
+        else
+        {
+            LoadEditor(pk);
+            SetStatus($"{from} evolved into {to}. Select a slot and click \"Save to selected slot\" to keep it.{dexNote}");
+        }
     }
 
     #endregion
