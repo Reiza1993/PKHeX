@@ -30,9 +30,12 @@ public static class InventoryEditor
         public void RaiseChanged() => Changed?.Invoke();
     }
 
-    private sealed record Row(int Index, string Text)
+    // A class (not a record) on purpose: rows from different refreshes must never compare as equal,
+    // otherwise the list keeps "ghost" selections from before the refresh.
+    private sealed class Row(int index, string text)
     {
-        public override string ToString() => Text;
+        public int Index { get; } = index;
+        public override string ToString() => text;
     }
 
     public static Window Create(SaveFile sav)
@@ -143,7 +146,8 @@ public static class InventoryEditor
         Row[] rows = [];
         bool loading = false;
 
-        List<int> Selected() => list.SelectedItems is { } items ? [.. items.OfType<Row>().Select(r => r.Index).Order()] : [];
+        // Selection is tracked by position, which always matches the current rows.
+        List<int> Selected() => [.. list.Selection.SelectedIndexes.Where(i => (uint)i < pouch.Items.Length).Distinct().Order()];
 
         void Refresh(IReadOnlyCollection<int>? keep = null)
         {
@@ -156,13 +160,15 @@ public static class InventoryEditor
                 rows[i] = new Row(i, it.Index == 0 && it.Count == 0 ? $"{i + 1,4}. —" : $"{i + 1,4}. {name} × {it.Count}");
             }
             loading = true;
+            list.Selection.Clear();
             list.ItemsSource = rows;
+            list.Selection.Clear();
             if (keep is not null)
             {
                 foreach (var i in keep)
                 {
                     if ((uint)i < rows.Length)
-                        list.SelectedItems?.Add(rows[i]);
+                        list.Selection.Select(i);
                 }
             }
             loading = false;
