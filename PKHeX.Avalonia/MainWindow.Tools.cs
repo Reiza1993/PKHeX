@@ -45,6 +45,7 @@ public partial class MainWindow
         MenuDex.IsEnabled = Safe(() => PokedexEditor.IsSupported(sav));
         MenuEvents.IsEnabled = Safe(() => EventFlagEditor.IsSupported(sav));
         MenuBoxes.IsEnabled = sav.HasBox;
+        BtnLivingDex.IsEnabled = sav.HasBox;
         MenuGen3.IsVisible = sav is SAV3;
 
         static bool Safe(Func<bool> f)
@@ -164,6 +165,37 @@ public partial class MainWindow
     #endregion
 
     #region Boxes
+
+    private async void Menu_LivingDex(object? sender, RoutedEventArgs e)
+    {
+        if (SAV is not { HasBox: true } sav)
+            return;
+        var plan = LivingDexSorter.CreatePlan(sav, out var problem);
+        if (plan is null)
+        {
+            await ShowMessage("Arrange boxes", problem ?? "The boxes can't be arranged.");
+            return;
+        }
+        if (!await Confirm("Arrange boxes by Pokédex number", LivingDexSorter.Describe(sav, plan) + "\n\nArrange now?"))
+            return;
+        LivingDexSorter.Apply(sav, plan);
+        Selected = null;
+        BoxSelector.SelectedIndex = 0;
+        RefreshAfterTool();
+        SetStatus($"Boxes arranged by Pokédex number ({plan.InDexSlots} in their own slot, {plan.Extras} extra). Use File → Save to write the save file.");
+    }
+
+    private async void Menu_Transfer(object? sender, RoutedEventArgs e)
+    {
+        if (SAV is not { HasBox: true } sav)
+        {
+            await ShowMessage("Transfer", "Open the save that should receive the Pokémon first.");
+            return;
+        }
+        var window = TransferWindow.Create(sav, RefreshAfterTool);
+        await window.ShowDialog(this);
+        RefreshAfterTool();
+    }
 
     private async void Menu_SortBoxes(object? sender, RoutedEventArgs e)
     {

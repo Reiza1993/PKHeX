@@ -23,6 +23,24 @@ public static class PokedexEditor
     /// </summary>
     private sealed record DexOps(Action<ushort> Seen, Action<ushort> Caught, Action<ushort> Clear, bool ExactSeen = true);
 
+    /// <summary>
+    /// Marks a species as seen and caught using the game's own Pokédex structures. Returns true if it is caught afterwards.
+    /// </summary>
+    public static bool TryMarkCaught(SaveFile sav, ushort species)
+    {
+        if (sav.GetCaught(species))
+            return true;
+        try
+        {
+            GetOps(sav)?.Caught(species);
+        }
+        catch (Exception)
+        {
+            // species not present in this game's Pokédex
+        }
+        return sav.GetCaught(species);
+    }
+
     private static DexOps? GetOps(SaveFile sav)
     {
         var language = (LanguageID)Math.Max(1, sav.Language);

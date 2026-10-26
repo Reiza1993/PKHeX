@@ -59,9 +59,11 @@
         <MenuItem x:Name="MenuEvents" Header="_Event flags…" Click="Menu_EventFlags" />
         <Separator />
         <MenuItem Header="Batch _editor…" Click="Menu_Batch" />
+        <MenuItem Header="Transfer _missing Pokémon from another save…" Click="Menu_Transfer" />
         <MenuItem x:Name="MenuGen3" IsVisible="False" Header="_Gen 3 tools (FireRed/LeafGreen, Ruby/Sapphire/Emerald)…" Click="Menu_Gen3" />
         <Separator />
         <MenuItem x:Name="MenuBoxes" Header="Bo_xes">
+          <MenuItem Header="Arrange by Pokédex number (living dex, gaps for missing)" Click="Menu_LivingDex" />
           <MenuItem Header="Sort all boxes by species" Click="Menu_SortBoxes" />
           <MenuItem Header="Clear current box" Click="Menu_ClearBox" />
           <MenuItem Header="Export all boxes to folder…" Click="Menu_DumpBoxes" />
@@ -99,6 +101,8 @@
                 <ComboBox Grid.Column="1" x:Name="BoxSelector" Margin="6,0" SelectionChanged="Box_Changed" />
                 <Button Grid.Column="2" Content="▶" Click="Box_Next" />
               </Grid>
+              <Button DockPanel.Dock="Bottom" x:Name="BtnLivingDex" Content="Arrange boxes by Pokédex number" Click="Menu_LivingDex"
+                      HorizontalAlignment="Left" Margin="2,8,0,0" IsEnabled="False" />
               <WrapPanel x:Name="BoxGrid" Width="480" />
             </DockPanel>
           </TabItem>
