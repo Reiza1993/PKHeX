@@ -15,10 +15,10 @@ namespace PKHeX.Avalonia;
 /// National Pokédex unlock and a National Dex completion helper.
 /// </summary>
 /// <remarks>
-/// Flag and variable numbers come from the pret/pokefirered decompilation (FireRed/LeafGreen scripts).
+/// Flag and variable numbers come from the pret/pokefirered and pret/pokeemerald decompilations.
 /// Variables are addressed by their index (game variable 0x4000 + index).
 /// </remarks>
-public static class Gen3Tools
+public static partial class Gen3Tools
 {
     public static Window Create(SAV3 sav, Action onChanged)
     {
@@ -56,6 +56,7 @@ public static class Gen3Tools
     private sealed record Context(SAV3 Sav, Window Window, Action OnChanged)
     {
         public bool IsFRLG => Sav is SAV3FRLG;
+        public bool IsEmerald => Sav is SAV3E;
         public List<Action> Refreshers { get; } = [];
         public TabControl? Tabs { get; set; }
 
@@ -99,7 +100,7 @@ public static class Gen3Tools
         return new ScrollViewer { Content = sp };
     }
 
-    private static Control OnlyFRLG(string feature) => Page(Explain($"{feature} is only available for FireRed / LeafGreen saves: the flag numbers it uses are specific to those games."));
+    private static Control OnlyFRLG(string feature) => Page(Explain($"{feature} is only available for FireRed / LeafGreen and Emerald saves: the flag numbers it uses are specific to those games."));
 
     #endregion
 
@@ -157,6 +158,8 @@ public static class Gen3Tools
 
     private static Control Starters(Context ctx)
     {
+        if (ctx.IsEmerald)
+            return StartersEmerald(ctx);
         if (!ctx.IsFRLG)
             return OnlyFRLG("The starter reset");
         var sav = ctx.Sav;
@@ -249,13 +252,14 @@ public static class Gen3Tools
 
     private static Control Legendaries(Context ctx)
     {
-        if (!ctx.IsFRLG)
+        if (!ctx.IsFRLG && !ctx.IsEmerald)
             return OnlyFRLG("Legendary respawn");
         var sav = ctx.Sav;
+        var legends = ctx.IsEmerald ? LegendsEmerald : Legends;
         var list = new TextBlock { FontFamily = new FontFamily("monospace"), Margin = new(0, 4) };
         void Refresh()
         {
-            var lines = Legends.Select(l =>
+            var lines = legends.Select(l =>
             {
                 var done = l.DoneFlags.Any(sav.GetEventFlag);
                 var state = done ? "gone (caught/beaten)" : "available";
@@ -268,17 +272,27 @@ public static class Gen3Tools
         var button = new Button { Content = "Respawn all legendaries & special Pokémon" };
         button.Click += async (_, _) =>
         {
-            foreach (var l in Legends)
+            foreach (var l in legends)
             {
                 foreach (var f in l.Flags)
                     sav.SetEventFlag(f, false);
             }
             ctx.Changed();
             Refresh();
-            await Ui.ShowMessage(ctx.Window, "Legendaries", "All of them are back. Click File → Save, then in your game walk into each area again (leave and re-enter the map) for them to appear.\n\nLugia, Ho-Oh and Deoxys also need the event islands to be unlocked (see the \"Islands & National Dex\" tab).");
+            await Ui.ShowMessage(ctx.Window, "Legendaries", "All of them are back. Click File → Save, then in your game walk into each area again (leave and re-enter the map) for them to appear.\n\n" +
+                (ctx.IsEmerald ? "They live on the event islands, which need their tickets (see the \"Islands & National Dex\" tab)." : "Lugia, Ho-Oh and Deoxys also need the event islands to be unlocked (see the \"Islands & National Dex\" tab)."));
         };
 
         Refresh();
+        if (ctx.IsEmerald)
+        {
+            return Page(
+                Explain("Makes the event-island Pokémon available again: Latios/Latias on Southern Island, Deoxys on Birth Island, Mew on Faraway Island, and Lugia and Ho-Oh at Navel Rock.\n\n" +
+                        "How it works: the game marks each one with a \"caught\" and a \"beaten\" flag. Clearing them makes it reappear the next time you enter its map. " +
+                        "Southern Island always has the Lati that is NOT roaming (Latias roaming → Latios on the island, and the other way round). " +
+                        "The other one-time Pokémon of Emerald (Groudon, Kyogre, Rayquaza, the Regis…) aren't covered here."),
+                button, Ui.Header("Current state"), list);
+        }
         return Page(
             Explain("Makes every one-time Pokémon encounter available again: Mewtwo, Moltres, Articuno, Zapdos, the two Power Plant Electrode, both Snorlax, Lugia, Ho-Oh and Deoxys.\n\n" +
                     "How it works: the game marks each one with a \"fought\" flag (and Lugia/Ho-Oh/Deoxys with a \"flew away\" flag if beaten instead of caught). Clearing those flags makes the game put the Pokémon back the next time you enter its map. Pokémon you already caught stay in your boxes."),
@@ -399,6 +413,8 @@ public static class Gen3Tools
         Load();
         ctx.Refreshers.Add(Load);
 
+        if (ctx.IsEmerald)
+            return RoamerEmerald(ctx, form.Grid, Ui.Row(save, heal, reroll, makeShiny));
         if (!ctx.IsFRLG)
         {
             return Page(
@@ -461,6 +477,8 @@ public static class Gen3Tools
 
     private static Control Islands(Context ctx)
     {
+        if (ctx.IsEmerald)
+            return IslandsEmerald(ctx);
         var sav = ctx.Sav;
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
 
@@ -507,7 +525,7 @@ public static class Gen3Tools
             Explain(ctx.IsFRLG
                 ? "\nEvent islands: Lugia, Ho-Oh and Deoxys were only obtainable with the Mystic Ticket and Aurora Ticket, given out at Nintendo events. " +
                   "This sets the same flags the event did and puts both tickets in your Key Items."
-                : "\nEvent islands (Mystic/Aurora Ticket) are only handled for FireRed/LeafGreen here."),
+                : "\nEvent islands (Mystic/Aurora Ticket) are only handled for FireRed/LeafGreen and Emerald here."),
             islands, Ui.Header("Current state"), status);
     }
 
