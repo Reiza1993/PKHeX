@@ -61,6 +61,79 @@ public partial class MainWindow
         public readonly ComboBox Feeling = Ui.Combo();
     }
 
+    private static readonly string[] PokerusStates =
+    [
+        "Never had it",
+        "Infected — doubles EVs gained from battles",
+        "Cured — still doubles EVs, can't be infected again",
+    ];
+
+    private bool PokerusAvailable;
+    private bool PokerusSyncing;
+
+    /// <summary> Fills strain/days from the simple Pokérus choice on the Main tab. </summary>
+    private void PokerusStateChanged()
+    {
+        if (PokerusSyncing || CB_Pokerus.SelectedIndex < 0)
+            return;
+        var strain = (int)(NUD_PKRSStrain.Value ?? 0);
+        int days;
+        switch (CB_Pokerus.SelectedIndex)
+        {
+            case 0:
+                strain = 0;
+                days = 0;
+                break;
+            case 1:
+                if (strain == 0)
+                    strain = NewPokerusStrain();
+                days = Pokerus.GetMaxDuration(strain); // a fresh infection lasts (strain % 4) + 1 days
+                break;
+            default:
+                if (strain == 0)
+                    strain = NewPokerusStrain();
+                days = 0;
+                break;
+        }
+        PokerusSyncing = true;
+        NUD_PKRSStrain.Value = strain;
+        NUD_PKRSDays.Value = days;
+        PokerusSyncing = false;
+        SyncPokerusState();
+    }
+
+    // Gen 2 can only produce strains up to 8; later games use 1-15.
+    private int NewPokerusStrain() => Util.Rand.Next(1, SAV?.Generation == 2 ? 9 : 16);
+
+    /// <summary> Shows the strain/days values as the simple Pokérus choice and a short explanation. </summary>
+    private void SyncPokerusState()
+    {
+        if (PokerusSyncing)
+            return;
+        var strain = (int)(NUD_PKRSStrain.Value ?? 0);
+        var days = (int)(NUD_PKRSDays.Value ?? 0);
+        var index = days != 0 ? 1 : strain != 0 ? 2 : 0;
+        PokerusSyncing = true;
+        CB_Pokerus.SelectedIndex = index;
+        PokerusSyncing = false;
+
+        if (!PokerusAvailable)
+        {
+            TB_PokerusInfo.Text = "This game has no Pokérus.";
+            return;
+        }
+        // FireRed/LeafGreen still double the EVs, but the code that infects, spreads and cures is stubbed out (pret/pokefirered).
+        bool frlg = SAV is SAV3FRLG;
+        TB_PokerusInfo.Text = index switch
+        {
+            1 when frlg => $"Strain {strain}. In FireRed/LeafGreen it never wears off and never spreads to other Pokémon.",
+            1 => $"Strain {strain}, {days} day(s) left. Spreads to the Pokémon next to it in the party after battles.",
+            2 => $"Strain {strain}. The doubled EVs stay forever, and it can't catch Pokérus again.",
+            _ when frlg => "FireRed/LeafGreen never give out Pokérus by themselves — set it here.",
+            _ => "Can catch it after a battle (very rarely) or from an infected party member.",
+        };
+    }
+
     private void BuildDetailTabs()
     {
         // Met tab
@@ -120,6 +193,11 @@ public partial class MainWindow
         misc.AddWide(Ui.Header("Pokérus"));
         NUD_PKRSStrain = misc.Add("Strain", Ui.Number(0, 15));
         NUD_PKRSDays = misc.Add("Days", Ui.Number(0, 15));
+        misc.AddWide(new TextBlock { Text = "The Main tab has a simple Pokérus choice that fills these in.", Opacity = 0.7, TextWrapping = global::Avalonia.Media.TextWrapping.Wrap });
+        CB_Pokerus.ItemsSource = PokerusStates;
+        CB_Pokerus.SelectionChanged += (_, _) => PokerusStateChanged();
+        NUD_PKRSStrain.ValueChanged += (_, _) => SyncPokerusState();
+        NUD_PKRSDays.ValueChanged += (_, _) => SyncPokerusState();
         misc.AddWide(Ui.Header("Identifiers (hex)"));
         TB_PID = misc.Add("PID", new TextBox { MaxLength = 8 });
         TB_EC = misc.Add("Encryption constant", new TextBox { MaxLength = 8 });
@@ -302,6 +380,9 @@ public partial class MainWindow
         NUD_PKRSStrain.Value = pk.PokerusStrain;
         NUD_PKRSDays.Value = pk.PokerusDays;
         NUD_PKRSStrain.IsEnabled = NUD_PKRSDays.IsEnabled = format >= 2;
+        PokerusAvailable = format >= 2 && pk is not (PB7 or PK9 or PA9);
+        CB_Pokerus.IsEnabled = PokerusAvailable;
+        SyncPokerusState();
         TB_PID.Text = LoadedPID = pk.PID.ToString("X8");
         TB_EC.Text = LoadedEC = pk.EncryptionConstant.ToString("X8");
         TB_PID.IsEnabled = format >= 3;

@@ -137,7 +137,7 @@
         <TabControl x:Name="EditorTabs">
           <TabItem Header="Main">
             <ScrollViewer>
-              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="4">
+              <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" Margin="4">
                 <TextBlock Classes="label" Grid.Row="0" Text="Species" />
                 <ComboBox Grid.Row="0" Grid.Column="1" x:Name="CB_Species" SelectionChanged="Species_Changed" />
                 <TextBlock Classes="label" Grid.Row="1" Text="Form" />
@@ -165,6 +165,11 @@
                 <StackPanel Grid.Row="10" Grid.Column="1" Orientation="Horizontal" Spacing="16">
                   <CheckBox x:Name="CHK_Shiny" Content="Shiny" />
                   <CheckBox x:Name="CHK_Egg" Content="Is Egg" />
+                </StackPanel>
+                <TextBlock Classes="label" Grid.Row="11" Text="Pokérus" />
+                <StackPanel Grid.Row="11" Grid.Column="1" Spacing="2">
+                  <ComboBox x:Name="CB_Pokerus" HorizontalAlignment="Stretch" />
+                  <TextBlock x:Name="TB_PokerusInfo" TextWrapping="Wrap" Opacity="0.75" />
                 </StackPanel>
               </Grid>
             </ScrollViewer>
