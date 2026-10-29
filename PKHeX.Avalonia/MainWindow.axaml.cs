@@ -432,8 +432,19 @@ public partial class MainWindow : Window
             await ShowMessage("Save to slot", "Choose a species first.");
             return;
         }
+        var original = pk;
+        if (CHK_AutoPid.IsChecked == true && PidFixer.IsSupported(pk))
+        {
+            if (await ResolvePid(pk, saving: true) is not { } resolved)
+                return;
+            pk = resolved;
+        }
         if (await WriteToSelectedSlot(pk))
-            SetStatus("Pokémon written to the selected slot. Use File → Save to write the save file.");
+        {
+            SetStatus(ReferenceEquals(pk, original)
+                ? "Pokémon written to the selected slot. Use File → Save to write the save file."
+                : "Pokémon written to the selected slot with a new legal PID. Use File → Save to write the save file.");
+        }
     }
 
     /// <summary> Writes <paramref name="pk"/> into the selected party/box slot. Returns false if nothing was written. </summary>

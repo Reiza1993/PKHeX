@@ -118,6 +118,9 @@
           <Button x:Name="BtnApply" Content="Save to selected slot" Click="Slot_Apply" IsEnabled="False" />
           <Button x:Name="BtnDelete" Content="Delete slot" Click="Slot_Delete" IsEnabled="False" />
           <Button Content="Check legality" Click="Menu_Legality" />
+          <Button Content="Fix PID" Click="Pid_Fix" ToolTip.Tip="Find a legal PID that matches the IVs, nature, gender, ability and shininess you set" />
+          <CheckBox x:Name="CHK_AutoPid" Content="Auto-fix PID on save" IsChecked="True" Margin="8,0,0,0"
+                    ToolTip.Tip="When saving to a slot, replace a PID that no longer matches the edited IVs/nature/gender/ability with a legal one" />
         </StackPanel>
 
         <Border DockPanel.Dock="Top" Padding="8" CornerRadius="4" Margin="0,0,0,8"
